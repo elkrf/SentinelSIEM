@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentinelSIEM — Connexion</title>
+<link rel="icon" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/css/app.css">
+<script>try{const t=localStorage.getItem('siem-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<div class="login-wrap">
+  <form class="panel login" id="f">
+    <div class="brand">
+      <img src="/static/favicon.svg" width="36" height="36" alt="">
+      <div>SentinelSIEM<small>Security Platform · macOS</small></div>
+    </div>
+    <label for="u">Utilisateur</label>
+    <input type="text" id="u" value="admin" autocomplete="username" required>
+    <label for="p">Mot de passe</label>
+    <input type="password" id="p" autocomplete="current-password" autofocus required>
+    <button class="btn primary" type="submit">Se connecter</button>
+    <div class="err" id="e"></div>
+    <p class="muted small" style="text-align:center;margin:8px 0 0">Mot de passe initial : <code>~/SentinelSIEM/data/admin_password.txt</code></p>
+  </form>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const e = document.getElementById('e'); e.textContent = '';
+  const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: u.value, password: p.value }) });
+  if (r.ok) location.href = '/'; else e.textContent = 'Identifiants invalides';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+#!/bin/bash
+# SentinelSIEM — contrôle du service
+set -e
+DIR="$(cd "$(dirname "$0")" && pwd)"
+LA="$HOME/Library/LaunchAgents"
+SIEM_PLIST="$LA/com.sentinelsiem.agent.plist"
+CLAMD_PLIST="$LA/com.sentinelsiem.clamd.plist"
+URL="http://localhost:5601"
+UID_=$(id -u)
+
+load() { launchctl bootstrap "gui/$UID_" "$1" 2>/dev/null || true; launchctl kickstart "gui/$UID_/$(basename "$1" .plist)" 2>/dev/null || true; }
+unload() { launchctl bootout "gui/$UID_/$(basename "$1" .plist)" 2>/dev/null || true; }
+running() { launchctl print "gui/$UID_/$1" 2>/dev/null | grep -q "state = running"; }
+
+case "${1:-status}" in
+  start)
+    load "$CLAMD_PLIST"; load "$SIEM_PLIST"
+    echo "SentinelSIEM démarré → $URL" ;;
+  stop)
+    unload "$SIEM_PLIST"; unload "$CLAMD_PLIST"; echo "SentinelSIEM arrêté" ;;
+  restart)
+    "$0" stop; sleep 1; "$0" start ;;
+  ensure)
+    running com.sentinelsiem.clamd || load "$CLAMD_PLIST"
+    running com.sentinelsiem.agent || load "$SIEM_PLIST" ;;
+  status)
+    for s in com.sentinelsiem.agent com.sentinelsiem.clamd; do
+      if running "$s"; then echo "● $s : actif"; else echo "○ $s : arrêté"; fi
+    done
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/login" || true)
+    if [ "$code" = "200" ]; then echo "● Console web : $URL"; else echo "○ Console web : injoignable (démarrage en cours ?)"; fi
+    [ -S /opt/homebrew/var/run/clamav/clamd.sock ] && echo "● Antivirus ClamAV : prêt" || echo "○ Antivirus ClamAV : chargement des signatures…" ;;
+  logs)
+    tail -n 100 -f "$DIR/data/logs/sentinel.log" ;;
+  open)
+    "$0" ensure; open "$URL" ;;
+  password)
+    if [ -f "$DIR/data/admin_password.txt" ]; then cat "$DIR/data/admin_password.txt"
+    else echo "Le mot de passe a été changé depuis la console. Pour le réinitialiser : $0 reset-password"; fi ;;
+  reset-password)
+    PW=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 14)
+    (cd "$DIR/backend" && "$DIR/.venv/bin/python" -c "from siem import auth; auth.set_password('admin', '$PW')")
+    printf "Utilisateur : admin\nMot de passe : %s\n" "$PW" > "$DIR/data/admin_password.txt"; chmod 600 "$DIR/data/admin_password.txt"
+    "$0" restart >/dev/null; cat "$DIR/data/admin_password.txt" ;;
+  update-signatures)
+    /opt/homebrew/bin/freshclam ;;
+  uninstall)
+    "$0" stop
+    rm -f "$SIEM_PLIST" "$CLAMD_PLIST"
+    rm -rf "$HOME/Applications/SentinelSIEM.app"
+    echo "Services supprimés. Les données restent dans $DIR (supprimez le dossier pour tout effacer)." ;;
+  *)
+    echo "Usage : siemctl {start|stop|restart|status|open|logs|password|reset-password|update-signatures|uninstall}" ;;
+esac

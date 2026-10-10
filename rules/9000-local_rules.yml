@@ -1,0 +1,13 @@
+# Règles personnalisées (chargées en dernier).
+# Une règle avec le même id qu'une règle par défaut la remplace.
+# Mettre `enabled: false` pour désactiver une règle.
+#
+# Exemple :
+# - id: 200001
+#   level: 8
+#   module: process
+#   type: [new]
+#   match: {name: '^Discord$'}
+#   description: 'Lancement de {name}'
+#   groups: [local]
+[]

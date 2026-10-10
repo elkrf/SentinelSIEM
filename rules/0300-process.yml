@@ -1,0 +1,297 @@
+# Règles — comportement des processus (EDR léger)
+- id: 100300
+  level: 14
+  module: process
+  type: [new, existing]
+  match: {cmdline: '(ba|z|k)?sh\s+-i\s*[<>&0-9 ]*/dev/(tcp|udp)/|/dev/tcp/\d|\bnc(at)?\b.*\s-(e|c)\s|ncat.*--(exec|sh-exec)|mkfifo.*\b(nc|ncat|telnet|openssl)\b|socat.*(exec|system):|python[\d.]*\s+-c\s+.*socket.*(connect|dup2)|perl\s+-e\s+.*Socket|ruby\s+-rsocket|php\s+-r\s+.*fsockopen|openssl\s+s_client.*\|\s*(ba|z)?sh'}
+  description: 'Reverse shell détecté : {name} (PID {pid}) — {cmdline}'
+  mitre: [T1059.004, T1071.001]
+  groups: [process, reverse_shell, attack]
+
+- id: 100301
+  level: 6
+  module: process
+  type: [new, existing]
+  match: {cmdline: '(curl|wget)\s[^|;]*\|\s*(sudo\s+)?(/bin/)?(ba|z|da)?sh\b'}
+  description: 'Téléchargement exécuté directement dans un shell (curl | sh) : {cmdline}'
+  mitre: [T1105, T1059.004]
+  groups: [process, download_execute]
+
+- id: 100302
+  level: 10
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'base64\s+(-d|-D|--decode)[^|]*\|\s*(ba|z)?sh|echo\s+[A-Za-z0-9+/=]{60,}\s*\|\s*base64|eval\s*\(\s*base64|exec\(.*(b64decode|decompress)'}
+  description: 'Commande obfusquée (base64 → shell) : {cmdline}'
+  mitre: [T1027, T1059.004]
+  groups: [process, obfuscation]
+
+- id: 100303
+  level: 12
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'osascript.*(display dialog).*(password|mot de passe|passwd)|osascript.*hidden answer'}
+  description: 'Fausse invite de mot de passe AppleScript (technique AMOS/Atomic Stealer) : {cmdline}'
+  mitre: [T1056.002, T1059.002]
+  groups: [process, stealer, attack]
+
+- id: 100304
+  level: 9
+  module: process
+  type: [new, existing]
+  match: {cmdline: '\bsecurity\s+(dump-keychain|find-generic-password\s+.*-w|find-internet-password\s+.*-w|export\s+-k|unlock-keychain)'}
+  description: 'Accès au trousseau (Keychain) en ligne de commande : {cmdline}'
+  mitre: [T1555.001]
+  groups: [process, credential_access]
+
+- id: 100305
+  level: 10
+  module: process
+  type: [new, existing]
+  match: {cmdline: '\b(sqlite3|cp|ditto|zip|cat|tar|scp|curl)\b.*(Login Data|Cookies\.binarycookies|/Cookies\b|cookies\.sqlite|logins\.json|key4\.db|Web Data|Local State|wallet\.dat|Exodus|Electrum|keychain-db)'}
+  description: 'Accès suspect aux données de navigateur / portefeuilles crypto : {cmdline}'
+  mitre: [T1555.003, T1539]
+  groups: [process, credential_access, stealer]
+
+- id: 100306
+  level: 8
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'spctl\s+(--master-disable|--global-disable|--disable)|xattr\s+(-[a-z]*[dc][a-z]*)\s+.*com\.apple\.quarantine|xattr\s+-c?r?d\s+com\.apple\.quarantine'}
+  description: 'Contournement de Gatekeeper / suppression de l''attribut de quarantaine : {cmdline}'
+  mitre: [T1553.001]
+  groups: [process, defense_evasion]
+
+- id: 100307
+  level: 12
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'csrutil\s+(disable|authenticated-root\s+disable)'}
+  description: 'Tentative de désactivation de SIP : {cmdline}'
+  mitre: [T1562.001]
+  groups: [process, defense_evasion]
+
+- id: 100308
+  level: 10
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'socketfilterfw\s+--setglobalstate\s+off|pfctl\s+-d\b|launchctl\s+(unload|bootout|disable).*(firewall|alf|XProtect|MRT|clamd|sentinel)'}
+  description: 'Désactivation des protections (pare-feu / antimalware) : {cmdline}'
+  mitre: [T1562.004, T1562.001]
+  groups: [process, defense_evasion]
+
+- id: 100309
+  level: 9
+  module: process
+  type: [new, existing]
+  match: {cmdline: '\blog\s+erase|rm\s+(-[rf]+\s+)?/(private/)?var/log|rm\s.*\.(zsh|bash)_history|history\s+-c|unset\s+HISTFILE|HISTFILE=/dev/null'}
+  description: 'Effacement de traces / journaux : {cmdline}'
+  mitre: [T1070.002]
+  groups: [process, defense_evasion]
+
+- id: 100310
+  level: 10
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'dscl\s+\.\s+-create\s+/Users/|sysadminctl\s+.*-addUser'}
+  description: 'Création d''un compte local : {cmdline}'
+  mitre: [T1136.001]
+  groups: [process, account]
+
+- id: 100311
+  level: 12
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'dseditgroup\s+-o\s+edit\s+.*-a\s+\S+.*admin|dscl\s+\.\s+-append\s+/Groups/admin'}
+  description: 'Ajout d''un utilisateur au groupe admin : {cmdline}'
+  mitre: [T1098]
+  groups: [process, privilege]
+
+- id: 100312
+  level: 10
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'launchctl\s+(load|bootstrap|submit).*(/tmp/|/private/tmp/|/Users/Shared/|/\.)'}
+  description: 'Chargement d''un service launchd depuis un emplacement suspect : {cmdline}'
+  mitre: [T1569.001, T1543.001]
+  groups: [process, persistence]
+
+- id: 100313
+  level: 6
+  module: process
+  type: [new, existing]
+  match: {cmdline: '\bscreencapture\s+(-\w*x|.*-x\b)'}
+  description: 'Capture d''écran silencieuse : {cmdline}'
+  mitre: [T1113]
+  groups: [process, collection]
+
+- id: 100314
+  level: 5
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'osascript.*the clipboard|pbpaste\s*\|\s*(curl|nc)'}
+  description: 'Lecture du presse-papiers par script : {cmdline}'
+  mitre: [T1115]
+  groups: [process, collection]
+
+- id: 100315
+  level: 6
+  module: process
+  type: [new, existing]
+  match: {cmdline: '\b(nmap|masscan|zmap|rustscan)\b|\bnc\s+-[a-z]*z'}
+  description: 'Scan réseau : {cmdline}'
+  mitre: [T1046]
+  groups: [process, discovery]
+
+- id: 100316
+  level: 6
+  module: process
+  type: [new, existing]
+  match: {cmdline: '(ps|pgrep|launchctl\s+list).*(LittleSnitch|LuLu|BlockBlock|KnockKnock|ClamAV|clamd|XProtect|Sentinel|CrowdStrike|falcon)'}
+  description: 'Recherche de logiciels de sécurité : {cmdline}'
+  mitre: [T1518.001]
+  groups: [process, discovery]
+
+- id: 100317
+  level: 13
+  module: process
+  type: [new, existing, high_cpu]
+  match: {cmdline: 'xmrig|minerd|cpuminer|ethminer|nbminer|t-rex|lolminer|phoenixminer|stratum\+(tcp|ssl)://|--donate-level|cryptonight|randomx'}
+  description: 'Cryptomineur détecté : {name} (PID {pid}) — {cmdline}'
+  mitre: [T1496]
+  groups: [process, cryptominer, attack]
+
+- id: 100318
+  level: 7
+  module: process
+  type: [new, existing]
+  match: {name: '^(tor|torsocks|obfs4proxy)$'}
+  description: 'Processus Tor lancé : {exe}'
+  mitre: [T1090.003]
+  groups: [process, anonymizer]
+
+- id: 100319
+  level: 9
+  module: process
+  type: [new, existing]
+  match: {exe: '^/(private/)?(tmp|var/tmp)/|^/Users/Shared/'}
+  not_match: {exe: '/claude-\d+/'}
+  description: 'Exécution depuis un répertoire temporaire/partagé : {exe}'
+  mitre: [T1204.002]
+  groups: [process, suspicious_location]
+
+- id: 100320
+  level: 10
+  module: process
+  type: [new, existing]
+  match: {hidden: 'True'}
+  description: 'Exécution d''un binaire caché : {exe}'
+  mitre: [T1564.001]
+  groups: [process, defense_evasion]
+
+- id: 100321
+  level: 8
+  module: process
+  type: [new, existing]
+  match: {cmdline: '\b(zip|ditto\s+-c|tar\s+-c\w*)\b.*(/tmp/|/Users/Shared/).*(Desktop|Documents|Keychains|Library/Application Support)'}
+  description: 'Archivage de données sensibles avant exfiltration possible : {cmdline}'
+  mitre: [T1560.001]
+  groups: [process, collection]
+
+- id: 100322
+  level: 7
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'curl\s.*(-F\s|--form|--data-binary\s+@|-T\s|--upload-file).*(/tmp/|\.zip|Library|Documents)'}
+  description: 'Envoi de fichier vers un serveur distant (exfiltration possible) : {cmdline}'
+  mitre: [T1048]
+  groups: [process, exfiltration]
+
+- id: 100323
+  level: 7
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'chmod\s+(\+x|[0-7]*7[0-7]*|u\+x)\s+.*/(private/)?(tmp|Users/Shared)/'}
+  description: 'Rendu exécutable d''un fichier temporaire : {cmdline}'
+  mitre: [T1222.002]
+  groups: [process]
+
+- id: 100324
+  level: 5
+  module: process
+  type: [new, existing]
+  match: {cmdline: '\bcrontab\s+(-e\b|-r\b|\S+\.\w+$|-$)'}
+  description: 'Modification de la crontab : {cmdline}'
+  mitre: [T1053.003]
+  groups: [process, persistence]
+
+- id: 100325
+  level: 11
+  module: process
+  type: [new, existing]
+  match: {cmdline: '(openssl\s+enc|gpg\s+(-c|--symmetric)).*(Documents|Desktop|Pictures)|find\s.*-exec\s+openssl\s+enc'}
+  description: 'Chiffrement massif de fichiers utilisateurs (rançongiciel possible) : {cmdline}'
+  mitre: [T1486]
+  groups: [process, ransomware]
+
+- id: 100326
+  level: 10
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'tmutil\s+(delete|disable|deletelocalsnapshots)|diskutil\s+(secureErase|zeroDisk)'}
+  description: 'Suppression des sauvegardes / effacement de disque : {cmdline}'
+  mitre: [T1485]
+  groups: [process, impact]
+
+- id: 100327
+  level: 8
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'tccutil\s+reset|sqlite3.*TCC\.db'}
+  description: 'Manipulation des permissions de confidentialité (TCC) : {cmdline}'
+  mitre: [T1562.001]
+  groups: [process, defense_evasion]
+
+- id: 100328
+  level: 7
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'python[\d.]*\s+-c\s+.*(urllib|requests|exec\(|base64)|perl\s+-e\s+.*(LWP|MIME::Base64)'}
+  description: 'Exécution de code Python/Perl en ligne suspecte : {cmdline}'
+  mitre: [T1059.006]
+  groups: [process, execution]
+
+- id: 100329
+  level: 4
+  module: process
+  type: [new]
+  match: {name: '^osascript$', cmdline: 'osascript\s+-e'}
+  description: 'Exécution AppleScript en ligne : {cmdline}'
+  mitre: [T1059.002]
+  groups: [process, execution]
+
+- id: 100330
+  level: 7
+  module: process
+  type: high_cpu
+  description: 'Consommation CPU anormale soutenue : {name} ({cpu}% pendant {duration}s) — minage possible'
+  mitre: [T1496]
+  groups: [process, resource]
+
+- id: 100331
+  level: 5
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'dscl\s+\.\s+(-list|list)\s+/Users|dscacheutil\s+-q\s+user|id\s+-Gn'}
+  description: 'Énumération des comptes locaux : {cmdline}'
+  mitre: [T1087.001]
+  groups: [process, discovery]
+
+- id: 100332
+  level: 8
+  module: process
+  type: [new, existing]
+  match: {cmdline: 'system_profiler\s+SPHardwareDataType\s+SPDisplaysDataType|ioreg\s+-rd1\s+-c\s+IOPlatformExpertDevice.*\|'}
+  description: 'Reconnaissance système typique des infostealers macOS : {cmdline}'
+  mitre: [T1082]
+  groups: [process, discovery, stealer]

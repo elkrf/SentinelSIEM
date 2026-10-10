@@ -1,0 +1,254 @@
+# Règles — intégrité des fichiers (FIM)
+- id: 100200
+  level: 3
+  module: fim
+  type: baseline
+  description: '{message}'
+  groups: [fim, syscheck]
+
+- id: 100201
+  level: 9
+  module: fim
+  type: added
+  match: {path: '/Library/LaunchAgents/[^/]+$'}
+  description: 'Persistance : nouveau LaunchAgent créé — {path}'
+  mitre: [T1543.001]
+  groups: [fim, persistence]
+
+- id: 100202
+  level: 7
+  module: fim
+  type: modified
+  match: {path: '/Library/LaunchAgents/[^/]+$'}
+  description: 'LaunchAgent modifié ({changes}) — {path}'
+  mitre: [T1543.001]
+  groups: [fim, persistence]
+
+- id: 100203
+  level: 11
+  module: fim
+  type: [added, modified]
+  match: {path: '^/Library/LaunchDaemons/'}
+  description: 'Persistance système : LaunchDaemon ajouté/modifié — {path}'
+  mitre: [T1543.004]
+  groups: [fim, persistence]
+
+- id: 100204
+  level: 5
+  module: fim
+  type: deleted
+  match: {path: '/Library/Launch(Agents|Daemons)/'}
+  description: 'Élément de lancement supprimé — {path}'
+  mitre: [T1070.004]
+  groups: [fim]
+
+- id: 100210
+  level: 9
+  module: fim
+  type: [added, modified, deleted]
+  match: {path: '^/private/etc/hosts$'}
+  description: 'Fichier /etc/hosts modifié (redirection DNS possible)'
+  mitre: [T1565.001]
+  groups: [fim, dns]
+
+- id: 100211
+  level: 10
+  module: fim
+  type: [added, modified, deleted]
+  match: {path: '^/private/etc/(sudoers|pam\.d|ssh/|shells|paths|profile|zshrc|zprofile|bashrc|resolv\.conf|pf\.conf|auto_master)'}
+  description: 'Fichier de configuration système critique modifié — {path}'
+  mitre: [T1548.003, T1546.004]
+  groups: [fim, system_config]
+
+- id: 100212
+  level: 5
+  module: fim
+  type: [added, modified, deleted]
+  match: {path: '^/private/etc/'}
+  description: 'Fichier de configuration système modifié — {path}'
+  mitre: [T1565.001]
+  groups: [fim, system_config]
+
+- id: 100220
+  level: 10
+  module: fim
+  type: [added, modified]
+  match: {path: '/\.ssh/authorized_keys2?$'}
+  description: 'Clé SSH autorisée ajoutée/modifiée (porte dérobée possible) — {path}'
+  mitre: [T1098.004]
+  groups: [fim, ssh, persistence]
+
+- id: 100221
+  level: 6
+  module: fim
+  type: [added, modified, deleted]
+  match: {path: '/\.ssh/'}
+  description: 'Changement dans ~/.ssh — {path} ({type})'
+  mitre: [T1552.001]
+  groups: [fim, ssh]
+
+- id: 100222
+  level: 8
+  module: fim
+  type: modified
+  match: {path: '/\.ssh/', changes: 'permissions'}
+  description: 'Permissions modifiées sur un fichier SSH — {path} ({old_perm} → {perm})'
+  mitre: [T1222.002]
+  groups: [fim, ssh]
+
+- id: 100230
+  level: 7
+  module: fim
+  type: [added, modified]
+  match: {path: '/\.(zshrc|zprofile|zshenv|zlogin|zlogout|bashrc|bash_profile|profile)$'}
+  description: 'Script de démarrage du shell modifié — {path}'
+  mitre: [T1546.004]
+  groups: [fim, persistence]
+
+- id: 100240
+  level: 4
+  module: fim
+  type: added
+  match: {path: '^/Applications/[^/]+$'}
+  description: 'Nouvelle application installée : {filename}'
+  groups: [fim, software]
+
+- id: 100241
+  level: 3
+  module: fim
+  type: deleted
+  match: {path: '^/Applications/[^/]+$'}
+  description: 'Application supprimée : {filename}'
+  groups: [fim, software]
+
+- id: 100250
+  level: 6
+  module: fim
+  type: added
+  match: {path: '^/usr/local/bin/'}
+  description: 'Nouveau binaire dans /usr/local/bin : {filename}'
+  mitre: [T1105]
+  groups: [fim]
+
+- id: 100260
+  level: 3
+  module: fim
+  type: added
+  match: {path: '/(Downloads|Desktop)/'}
+  description: 'Nouveau fichier : {path}'
+  groups: [fim, downloads]
+
+- id: 100261
+  level: 6
+  module: fim
+  type: added
+  match: {path: '/(Downloads|Desktop)/.*\.(command|sh|scpt|applescript|tool|pkg|mpkg|jar|py|pl|terminal)$'}
+  description: 'Script/installeur téléchargé : {path}'
+  mitre: [T1204.002]
+  groups: [fim, downloads]
+
+- id: 100262
+  level: 6
+  module: fim
+  type: added
+  match: {path: '/(Downloads|Desktop)/', is_exec: 'True'}
+  description: 'Fichier exécutable téléchargé : {path}'
+  mitre: [T1204.002]
+  groups: [fim, downloads]
+
+- id: 100263
+  level: 7
+  module: fim
+  type: added
+  match: {path: '/(Downloads|Desktop|Users/Shared|private/tmp)/', hidden: 'True'}
+  not_match: {filename: '^\.(DS_Store|localized|com\.apple)'}
+  description: 'Fichier caché créé : {path}'
+  mitre: [T1564.001]
+  groups: [fim, defense_evasion]
+
+- id: 100264
+  level: 5
+  module: fim
+  type: added
+  match: {path: '^/Users/Shared/'}
+  description: 'Fichier déposé dans /Users/Shared : {path}'
+  mitre: [T1105]
+  groups: [fim]
+
+- id: 100265
+  level: 8
+  module: fim
+  type: added
+  match: {path: '^/(Users/Shared|private/tmp)/', is_exec: 'True'}
+  description: 'Exécutable déposé dans un répertoire partagé/temporaire : {path}'
+  mitre: [T1105, T1204.002]
+  groups: [fim, malware_staging]
+
+- id: 100270
+  level: 4
+  module: fim
+  type: modified
+  match: {changes: 'permissions'}
+  description: 'Permissions modifiées — {path} ({old_perm} → {perm})'
+  mitre: [T1222.002]
+  groups: [fim]
+
+- id: 100271
+  level: 6
+  module: fim
+  type: modified
+  match: {changes: 'propriétaire'}
+  description: 'Propriétaire modifié — {path} ({old_owner} → {owner})'
+  mitre: [T1222.002]
+  groups: [fim]
+
+- id: 100280
+  level: 12
+  module: fim
+  type: [added, modified]
+  match: {path: '\.(encrypted|enc|locked|crypt|crypted|ransom|lockbit|cerber|locky|wncry|akira|blackcat)$'}
+  description: 'Fichier avec extension de rançongiciel : {path}'
+  mitre: [T1486]
+  groups: [fim, ransomware]
+
+- id: 100281
+  level: 12
+  module: fim
+  type: added
+  match: {filename: '^(README|HOW|DECRYPT|RESTORE|RECOVER|_readme|!!!).*(DECRYPT|RECOVER|RESTORE|FILES|RANSOM|readme).*\.(txt|html|hta|rtf)$'}
+  description: 'Note de rançon potentielle créée : {path}'
+  mitre: [T1486]
+  groups: [fim, ransomware]
+
+- id: 100290
+  level: 3
+  module: fim
+  type: deleted
+  description: 'Fichier supprimé — {path}'
+  mitre: [T1070.004]
+  groups: [fim]
+
+- id: 100291
+  level: 2
+  module: fim
+  type: modified
+  description: 'Fichier modifié ({changes}) — {path}'
+  groups: [fim]
+
+- id: 100292
+  level: 10
+  if_matched_sid: 100290
+  frequency: 25
+  timeframe: 60
+  description: 'Suppression massive de fichiers (≥25 en 60 s) — destruction de données possible'
+  mitre: [T1485]
+  groups: [fim, ransomware]
+
+- id: 100293
+  level: 12
+  if_matched_sid: 100291
+  frequency: 40
+  timeframe: 60
+  description: 'Modification massive de fichiers (≥40 en 60 s) — comportement de rançongiciel possible'
+  mitre: [T1486]
+  groups: [fim, ransomware]

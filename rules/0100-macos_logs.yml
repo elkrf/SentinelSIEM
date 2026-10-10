@@ -1,0 +1,190 @@
+# Règles — journaux unifiés macOS (sudo, ssh, XProtect, Gatekeeper, authentification)
+# Niveaux : 0-3 info · 4-6 faible · 7-11 moyen/élevé · 12-14 critique · 15 sévère
+- id: 100100
+  level: 3
+  module: logs
+  match: {process: '^sudo$', message: 'COMMAND='}
+  description: 'sudo : {user} a exécuté « {command} » en tant que {target_user}'
+  mitre: [T1548.003]
+  groups: [sudo, privilege]
+
+- id: 100101
+  level: 5
+  module: logs
+  match: {process: '^sudo$', message: 'incorrect password attempt'}
+  description: 'sudo : mot de passe incorrect pour {user}'
+  mitre: [T1110.001]
+  groups: [sudo, authentication_failed]
+
+- id: 100102
+  level: 9
+  module: logs
+  match: {process: '^sudo$', message: 'NOT in sudoers|command not allowed'}
+  description: 'sudo : tentative d''élévation refusée pour {user} (non autorisé dans sudoers)'
+  mitre: [T1548.003]
+  groups: [sudo, privilege, authentication_failed]
+
+- id: 100103
+  level: 8
+  module: logs
+  match: {process: '^sudo$', message: '3 incorrect password attempts'}
+  description: 'sudo : 3 mots de passe incorrects consécutifs pour {user}'
+  mitre: [T1110.001]
+  groups: [sudo, authentication_failed]
+
+- id: 100104
+  level: 10
+  if_matched_sid: 100101
+  frequency: 4
+  timeframe: 180
+  same_field: user
+  description: 'Force brute sudo possible : multiples échecs pour {user}'
+  mitre: [T1110]
+  groups: [sudo, brute_force]
+
+- id: 100110
+  level: 6
+  module: logs
+  match: {process: '^su$', message: 'BAD SU|fail|incorrect|Sorry'}
+  description: 'su : échec de changement d''utilisateur'
+  mitre: [T1110.001]
+  groups: [su, authentication_failed]
+
+- id: 100111
+  level: 4
+  module: logs
+  match: {process: '^su$', message: 'to (root|\w+) on|session opened'}
+  description: 'su : changement d''utilisateur'
+  mitre: [T1548.003]
+  groups: [su, privilege]
+
+- id: 100120
+  level: 5
+  module: logs
+  match: {process: '^sshd', message: 'Failed password|Invalid user|authentication failure|Failed keyboard-interactive|Failed publickey'}
+  description: 'SSH : échec d''authentification pour {user} depuis {src_ip}'
+  mitre: [T1110.001]
+  groups: [ssh, authentication_failed]
+
+- id: 100121
+  level: 4
+  module: logs
+  match: {process: '^sshd', message: 'Accepted (password|publickey|keyboard)'}
+  description: 'SSH : connexion réussie de {user} depuis {src_ip}'
+  mitre: [T1021.004]
+  groups: [ssh, authentication_success]
+
+- id: 100122
+  level: 10
+  if_matched_sid: 100120
+  frequency: 5
+  timeframe: 120
+  same_field: src_ip
+  description: 'SSH : attaque par force brute depuis {src_ip}'
+  mitre: [T1110]
+  groups: [ssh, brute_force]
+
+- id: 100123
+  level: 7
+  module: logs
+  match: {process: '^sshd', message: 'Accepted password for root|ROOT LOGIN'}
+  description: 'SSH : connexion directe en root depuis {src_ip}'
+  mitre: [T1078, T1021.004]
+  groups: [ssh, authentication_success]
+
+- id: 100130
+  level: 7
+  module: logs
+  match: {process: 'screensharingd', message: 'fail|denied|invalid'}
+  description: 'Partage d''écran : échec d''authentification VNC'
+  mitre: [T1021.005, T1110]
+  groups: [vnc, authentication_failed]
+
+- id: 100131
+  level: 5
+  module: logs
+  match: {process: 'screensharingd', message: 'Authentication|connection|client'}
+  description: 'Partage d''écran : connexion distante'
+  mitre: [T1021.005]
+  groups: [vnc]
+
+- id: 100140
+  level: 12
+  module: logs
+  match: {process: 'XProtect|syspolicyd', message: '(malware|threat).{0,40}(found|detected|blocked)|detected malware|remediat(ed|ion succeeded)|is malware'}
+  description: 'XProtect : logiciel malveillant détecté/remédié par macOS'
+  mitre: [T1204.002]
+  groups: [xprotect, malware]
+
+- id: 100141
+  level: 12
+  module: logs
+  match: {subsystem: 'XProtectFramework', message: 'detect|remediat|malware'}
+  description: 'XProtect Remediator : détection de menace'
+  mitre: [T1204.002]
+  groups: [xprotect, malware]
+
+- id: 100150
+  level: 7
+  module: logs
+  match: {subsystem: 'com.apple.syspolicy.exec', message: 'deny'}
+  description: 'Gatekeeper a bloqué l''exécution d''un logiciel non approuvé'
+  mitre: [T1553.001, T1204.002]
+  groups: [gatekeeper]
+
+- id: 100160
+  level: 5
+  module: logs
+  match: {process: 'loginwindow', message: '_numFailedAuthAttempts = [1-9]|authentication failed|incorrect password'}
+  description: 'Échec de déverrouillage / d''ouverture de session (mot de passe invalide)'
+  mitre: [T1110.001]
+  groups: [login, authentication_failed]
+
+- id: 100161
+  level: 5
+  module: logs
+  match: {process: 'opendirectoryd', message: 'Authentication failed for .*CredentialsInvalid'}
+  description: 'Échec d''authentification locale : mot de passe invalide (Open Directory)'
+  mitre: [T1110.001]
+  groups: [authentication_failed]
+
+- id: 100162
+  level: 10
+  if_matched_sid: 100161
+  frequency: 5
+  timeframe: 120
+  description: 'Multiples échecs d''authentification locale (force brute possible)'
+  mitre: [T1110]
+  groups: [brute_force]
+
+- id: 100163
+  level: 3
+  module: logs
+  match: {process: '^authd$', message: 'Failed to authorize|authentication failed'}
+  description: 'Échec d''autorisation (authd)'
+  mitre: [T1548.003]
+  groups: [authentication_failed]
+
+- id: 100164
+  level: 8
+  module: logs
+  match: {process: 'screensaverengine', message: 'fail'}
+  description: 'Échec de déverrouillage de l''économiseur d''écran'
+  mitre: [T1110.001]
+  groups: [authentication_failed]
+
+- id: 100170
+  level: 9
+  module: logs
+  match: {process: 'sysadminctl', message: 'addUser|Creating user|deleteUser|Deleting user|-adminUser'}
+  description: 'sysadminctl : gestion de comptes utilisateurs'
+  mitre: [T1136.001]
+  groups: [account]
+
+- id: 100180
+  level: 10
+  module: logs
+  match: {process: 'socketfilterfw', message: 'disabled'}
+  description: 'Le pare-feu applicatif macOS a été désactivé'
+  mitre: [T1562.004]
+  groups: [firewall, defense_evasion]

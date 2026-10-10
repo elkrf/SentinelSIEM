@@ -1,0 +1,14 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Données d'exécution — NE JAMAIS VERSIONNER
+# (base d'alertes, journaux, fichiers en quarantaine = malwares, mot de passe admin)
+data/
+
+# Système / éditeurs
+.DS_Store
+*.log
+.idea/
+.vscode/

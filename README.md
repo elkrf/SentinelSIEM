@@ -98,7 +98,7 @@ Dépendances Python (installées dans `.venv/` depuis [`requirements.txt`](requi
 ## Installation
 
 ```bash
-git clone https://github.com/<compte>/SentinelSIEM.git ~/SentinelSIEM
+git clone https://github.com/ELKEMITE/SentinelSIEM.git ~/SentinelSIEM
 cd ~/SentinelSIEM
 ./scripts/install.sh
 ```

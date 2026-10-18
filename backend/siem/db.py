@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS sca_results (
     ts REAL
 );
 
+CREATE TABLE IF NOT EXISTS alert_ai_notes (
+    alert_id INTEGER PRIMARY KEY,
+    ts REAL,
+    model TEXT,
+    text TEXT
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -145,3 +152,4 @@ def purge_old_alerts():
     days = int(get_settings().get("retention_days", 30))
     cutoff = time.time() - days * 86400
     execute("DELETE FROM alerts WHERE ts < ?", (cutoff,))
+    execute("DELETE FROM alert_ai_notes WHERE alert_id NOT IN (SELECT id FROM alerts)")

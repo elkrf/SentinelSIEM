@@ -258,3 +258,15 @@ pre.code { background: var(--bg); border: 1px solid var(--border); border-radius
 .login input { width: 100%; padding: 10px 12px; }
 .login .btn { width: 100%; justify-content: center; margin-top: 20px; padding: 10px; }
 .login .err { color: var(--danger); font-size: 12.5px; margin-top: 12px; min-height: 18px; text-align: center; }
+
+/* Explication de l'alerte (« En gros ») */
+.note { border: 1px solid var(--border-2); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--panel-2); padding: 12px 14px; margin-bottom: 16px; line-height: 1.5; }
+.note.ok { border-left-color: var(--ok); }
+.note.warn { border-left-color: var(--warn); }
+.note.crit { border-left-color: var(--danger); }
+.note-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; font-weight: 600; }
+.note p { margin: 6px 0; }
+.note .muted { color: var(--text-2); }
+.note ul { margin: 6px 0 0 18px; padding: 0; }
+.note .ai { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border-2); white-space: pre-wrap; }
+.note .ai-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; margin-bottom: 4px; }

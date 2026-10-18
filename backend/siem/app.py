@@ -12,11 +12,12 @@ from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import auth, bus, db, inventory
+from . import ai_note, auth, bus, db, inventory
+from .explain import explain
 from .collectors.base import REGISTRY
 from .collectors.fim import FIMCollector
 from .collectors.malware import MalwareScanner, delete_quarantined, eicar_bytes, quarantine_file, restore_file
@@ -95,14 +96,24 @@ async def auth_mw(request: Request, call_next):
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
+def _page(name):
+    """Sert une page HTML en versionnant app.js / app.css (date de modification) pour que le
+    navigateur recharge toujours l'interface après une mise à jour."""
+    html = (FRONTEND_DIR / name).read_text()
+    for asset in ("js/app.js", "css/app.css"):
+        v = int((FRONTEND_DIR / asset).stat().st_mtime)
+        html = html.replace(f"/static/{asset}\"", f"/static/{asset}?v={v}\"")
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/")
 def index():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return _page("index.html")
 
 
 @app.get("/login")
 def login_page():
-    return FileResponse(FRONTEND_DIR / "login.html")
+    return _page("login.html")
 
 
 @app.get("/favicon.ico")
@@ -296,7 +307,31 @@ def get_alert(aid: int):
     rule = bus.engine.by_id.get(r["rule_id"])
     r["rule"] = rule.to_dict() if rule else None
     r["mitre_details"] = [{"id": t, "name": MITRE_T.get(t, (t,))[0]} for t in (r["mitre"] or "").split(",") if t]
+    try:
+        r["note"] = explain(r, r["data"], rule)
+    except Exception as e:
+        log.warning("Explication de l'alerte %s impossible : %s", aid, e)
+        r["note"] = None
+    r["ai_note"] = db.query_one("SELECT ts, model, text FROM alert_ai_notes WHERE alert_id=?", (aid,))
+    r["ai_available"] = bool(ai_note.claude_bin())
     return r
+
+
+@app.post("/api/alerts/{aid}/ai")
+def alert_ai(aid: int, refresh: bool = False):
+    """Analyse approfondie par Claude (CLI `claude`, sans outils), mise en cache."""
+    if not refresh:
+        cached = db.query_one("SELECT ts, model, text FROM alert_ai_notes WHERE alert_id=?", (aid,))
+        if cached:
+            return cached
+    a = get_alert(aid)
+    try:
+        text, model = ai_note.analyze(a)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    row = {"ts": time.time(), "model": model, "text": text}
+    db.execute("INSERT OR REPLACE INTO alert_ai_notes(alert_id, ts, model, text) VALUES(?,?,?,?)", (aid, row["ts"], model, text))
+    return row
 
 
 class StatusBody(BaseModel):

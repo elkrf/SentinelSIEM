@@ -267,6 +267,41 @@ function closeFly() { $('#fly').classList.remove('open'); $('#fly-bg').classList
 $('#fly-bg').addEventListener('click', closeFly);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFly(); });
 
+const VERDICT_TAG = { ok: 'ok', info: 'info', warn: 'warn', crit: 'fail' };
+function aiBlock(a) {
+  const n = a.ai_note;
+  if (n) return `<div class="ai"><div class="ai-h">✨ Analyse IA <span class="muted small" style="font-weight:400">${esc(n.model)} · ${fmtFull(n.ts)}</span>
+    <button class="btn sm" data-ai="refresh" style="margin-left:auto">Relancer</button></div>${esc(n.text)}</div>`;
+  if (!a.ai_available) return '';
+  return `<div class="ai"><button class="btn sm" data-ai="run">✨ Analyse IA approfondie</button>
+    <span class="muted small">Claude lit l'alerte et son contexte et donne son avis (quelques secondes).</span></div>`;
+}
+function noteHtml(a) {
+  const n = a.note;
+  if (!n) return '';
+  const v = n.verdict || {};
+  return `<div class="note ${esc(v.level || '')}" id="note">
+    <div class="note-h">En gros <span class="tag ${VERDICT_TAG[v.level] || 'info'}">${esc(v.label || '')}</span></div>
+    <p>${esc(n.summary)}</p>
+    ${n.meaning ? `<p class="muted">${esc(n.meaning)}</p>` : ''}
+    ${(n.why || []).map((w) => `<p class="muted small">${esc(w)}</p>`).join('')}
+    ${v.reason ? `<p><b>Verdict :</b> ${esc(v.reason)}</p>` : ''}
+    ${(n.advice || []).length ? `<b>Que faire :</b><ul>${n.advice.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    <div id="ai-note">${aiBlock(a)}</div>
+  </div>`;
+}
+function bindAiNote(a) {
+  $('#ai-note')?.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-ai]');
+    if (!b) return;
+    b.disabled = true; b.textContent = 'Analyse en cours…';
+    try {
+      a.ai_note = await api(`/api/alerts/${a.id}/ai${b.dataset.ai === 'refresh' ? '?refresh=true' : ''}`, { method: 'POST' });
+    } catch (er) { fail(er); }
+    $('#ai-note').innerHTML = aiBlock(a);
+  });
+}
+
 async function showAlert(id, onChange) {
   let a;
   try { a = await api(`/api/alerts/${id}`); } catch (e) { return fail(e); }
@@ -287,6 +322,7 @@ async function showAlert(id, onChange) {
     .map(([k, v]) => `<div>${esc(k)}</div><div class="mono">${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</div>`).join('');
   $('#fly-b').innerHTML = `
     <div class="actions" style="margin-bottom:14px">${actions.join('')}</div>
+    ${noteHtml(a)}
     <div class="kv">
       <div>Statut</div><div>${statusTag(a.status)}</div>
       <div>Agent</div><div>${esc(a.agent)}</div>
@@ -303,6 +339,7 @@ async function showAlert(id, onChange) {
     <div class="section-t">Définition de la règle</div>
     <pre class="code">${esc(JSON.stringify({ id: r.id, level: r.level, description: r.description, module: r.module, type: r.types, match: r.match, mitre: r.mitre, groups: r.groups, frequency: r.frequency || undefined, timeframe: r.correlation ? r.timeframe : undefined, if_matched_sid: r.if_matched_sid || undefined, file: r.source }, null, 2))}</pre>`;
   bindMitre($('#fly-b'));
+  bindAiNote(a);
   $$('#fly-b [data-st]').forEach((b) => b.addEventListener('click', async () => {
     await api('/api/alerts/status', { method: 'POST', body: { ids: [a.id], status: b.dataset.st } }).catch(fail);
     ok(`Alerte #${a.id} : ${STATUS[b.dataset.st]}`); closeFly(); onChange && onChange();
@@ -729,7 +766,8 @@ async function pSettings(main) {
     <div class="grid g2">
       ${panel('Intégrité des fichiers', `<div class="panel-b"><div class="section-t">Répertoires surveillés (JSON)</div><textarea id="fim_paths" style="min-height:260px">${esc(JSON.stringify(s.fim_paths, null, 2))}</textarea>
         <div class="section-t" style="margin-top:12px">Exclusions (regex, une par ligne)</div><textarea id="fim_ignore">${esc((s.fim_ignore || []).join('\n'))}</textarea></div>`)}
-      ${panel('Analyse antimalware temps réel', `<div class="panel-b"><div class="section-t">Emplacements analysés automatiquement (un par ligne)</div><textarea id="scan_paths" style="min-height:200px">${esc((s.scan_paths || []).join('\n'))}</textarea></div>`)}
+      ${panel('Analyse antimalware temps réel', `<div class="panel-b"><div class="section-t">Emplacements analysés automatiquement (un par ligne)</div><textarea id="scan_paths" style="min-height:200px">${esc((s.scan_paths || []).join('\n'))}</textarea>
+        <div class="section-t" style="margin-top:12px">Jamais analysés — exclusions (regex, une par ligne)</div><textarea id="scan_exclude">${esc((s.scan_exclude || []).join('\n'))}</textarea></div>`)}
     </div>
     ${panel('Compte administrateur', `<div class="panel-b"><div class="flex" style="flex-wrap:wrap"><input type="password" id="pw-cur" placeholder="Mot de passe actuel"><input type="password" id="pw-new" placeholder="Nouveau mot de passe (8+ car.)"><button class="btn" id="pw">Changer le mot de passe</button></div></div>`)}`;
   const lines = (id) => $(id).value.split('\n').map((x) => x.trim()).filter(Boolean);
@@ -744,6 +782,7 @@ async function pSettings(main) {
       ioc_ips: lines('#ioc_ips'), ioc_hashes: lines('#ioc_hashes').map((h) => h.toLowerCase()),
       suspicious_ports: $('#suspicious_ports').value.split(',').map((x) => +x.trim()).filter(Boolean),
       fim_paths: fimPaths, fim_ignore: lines('#fim_ignore'), scan_paths: lines('#scan_paths'),
+      scan_exclude: lines('#scan_exclude'),
     };
     try { await api('/api/settings', { method: 'PUT', body }); ok('Paramètres enregistrés'); } catch (e) { fail(e); }
   });

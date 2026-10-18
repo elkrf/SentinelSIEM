@@ -11,6 +11,10 @@
 ![MITRE](https://img.shields.io/badge/MITRE-ATT%26CK-orange)
 ![Licence](https://img.shields.io/badge/licence-propri%C3%A9taire-lightgrey)
 
+<br>
+
+<img src="docs/screenshots/overview.png" alt="Vue d'ensemble de la console SentinelSIEM" width="900">
+
 </div>
 
 ---
@@ -19,6 +23,8 @@
 
 - [Présentation](#présentation)
 - [Fonctionnalités](#fonctionnalités)
+- [Captures d'écran](#captures-décran)
+- [Explication des alertes (« En gros » + IA)](#explication-des-alertes--en-gros--ia)
 - [Prérequis](#prérequis)
 - [Installation](#installation)
 - [Premier lancement](#premier-lancement)
@@ -62,7 +68,45 @@ mappées sur **MITRE ATT&CK**, stockées dans SQLite et poussées en temps réel
 | **SCA (conformité)** | 26 contrôles inspirés du CIS Benchmark macOS (FileVault, pare-feu, SIP, Gatekeeper, XProtect, mises à jour, partages, compte invité, verrouillage d'écran…) avec remédiation ; alerte en cas de régression |
 
 Chaque alerte reçoit un niveau **0–15**, un mapping **MITRE ATT&CK**, et déclenche une
-**notification macOS** à partir du niveau 10 (seuil réglable).
+**notification macOS** à partir du niveau 10 (seuil réglable). Chaque alerte est aussi **expliquée en
+français simple** (voir plus bas).
+
+**Peu de bruit, comme un Wazuh bien réglé** : les règles YARA « texte » ne s'appliquent qu'à du contenu
+réellement exécutable (Mach-O, scripts), les données d'assistants IA, caches de navigateurs et dépôts de
+paquets sont exclus de l'analyse, un binaire correctement signé n'est jamais signalé, et une même détection
+n'est remontée qu'une fois par 24 h.
+
+---
+
+## Captures d'écran
+
+> Captures réalisées sur une instance de démonstration (données fictives, utilisateur « alex »).
+
+| | |
+|---|---|
+| <img src="docs/screenshots/events.png" alt="Événements de sécurité" width="440"><br>**Événements de sécurité** — filtres, statut, export | <img src="docs/screenshots/mitre.png" alt="Matrice MITRE ATT&CK" width="440"><br>**Matrice MITRE ATT&CK** — couverture et techniques observées |
+| <img src="docs/screenshots/malware.png" alt="Détection de malwares" width="440"><br>**Détection de malwares** — ClamAV + YARA, quarantaine | <img src="docs/screenshots/sca.png" alt="Évaluation de la configuration" width="440"><br>**Évaluation de la configuration (SCA)** — contrôles CIS |
+
+## Explication des alertes (« En gros » + IA)
+
+<img src="docs/screenshots/alert-detail.png" alt="Détail d'une alerte avec explication et analyse IA" width="900">
+
+En cliquant sur une alerte, un encadré **« En gros »** explique ce qui s'est passé, sans jargon :
+
+- **quoi, où, qui** : le programme, le fichier ou le service concerné et l'action réalisée ;
+- **ce que signifie** ce type d'alerte, et **pourquoi** elle s'est déclenchée (pour une corrélation :
+  nombre d'occurrences et plage horaire) ;
+- un **verdict probable** (*Faux positif probable*, *Bénin probable*, *À vérifier*, *Suspect*…) et
+  **quoi faire**.
+
+Cette explication est calculée **localement et instantanément** (`backend/siem/explain.py`), pour
+toutes les alertes.
+
+Le bouton **« ✨ Analyse IA approfondie »** demande en plus à Claude (via le CLI
+[`claude`](https://claude.com/claude-code), avec votre compte) d'analyser l'alerte **et les alertes
+voisines** : il relie par exemple un faux installeur, la fausse invite de mot de passe et la persistance
+créée juste après. Claude est lancé **sans aucun outil** (il ne peut ni lire de fichiers ni exécuter
+de commandes) ; le résultat est mis en cache. Disponible si le CLI `claude` est installé et connecté.
 
 ---
 
@@ -180,6 +224,7 @@ path:Downloads                  user:root "reverse"
 | **YARA** | Déposer des fichiers `.yar` dans `yara/` | *Règles → Recharger* |
 | **IOC** | *Paramètres → Indicateurs de compromission* (IP, hashs SHA-256, ports) | immédiate |
 | **Chemins FIM / analyse** | *Paramètres* (valeurs par défaut dans `backend/siem/config.py`) | immédiate |
+| **Exclusions antimalware** | *Paramètres → Analyse antimalware → Jamais analysés* (regex) | immédiate |
 
 Exemple de règle locale :
 
@@ -219,6 +264,8 @@ SentinelSIEM/
 │   ├── rules.py          moteur de règles (regex, niveaux, corrélation fréquence/fenêtre)
 │   ├── mitre.py          référentiel MITRE ATT&CK
 │   ├── auth.py           authentification (PBKDF2-SHA256 + sessions)
+│   ├── explain.py        explication « En gros » de chaque alerte (local)
+│   ├── ai_note.py        analyse IA d'une alerte à la demande (CLI claude, sans outils)
 │   ├── db.py · config.py · inventory.py
 │   └── collectors/       unifiedlog · fim · process · network · malware · persistence · system · sca
 ├── rules/*.yml           règles de détection (style Wazuh, MITRE ATT&CK)
@@ -226,6 +273,7 @@ SentinelSIEM/
 ├── frontend/             console web (HTML / CSS / JS, Chart.js)
 ├── scripts/install.sh    installation idempotente
 ├── siemctl               contrôle des services
+├── docs/screenshots/     captures d'écran (instance de démonstration)
 └── data/                 (généré, non versionné) siem.db · quarantine/ · logs/ · admin_password.txt
 ```
 
@@ -247,6 +295,9 @@ SentinelSIEM/
   les journaux, le mot de passe initial et la **quarantaine (fichiers malveillants neutralisés)**.
 - Mots de passe stockés en PBKDF2-SHA256 (310 000 itérations, sel aléatoire) ; sessions de 12 h.
 - Rétention des événements : 30 jours par défaut (*Paramètres*).
+- **Analyse IA** : rien n'est envoyé tant que vous ne cliquez pas sur le bouton ; l'alerte concernée
+  (journal, chemins, ligne de commande) et les descriptions des alertes voisines sont alors transmises
+  à Claude via le CLI `claude`.
 
 ## Dépannage
 

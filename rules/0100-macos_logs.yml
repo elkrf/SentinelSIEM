@@ -111,18 +111,19 @@
 - id: 100140
   level: 12
   module: logs
-  match: {process: 'XProtect|syspolicyd', message: '(malware|threat).{0,40}(found|detected|blocked)|detected malware|remediat(ed|ion succeeded)|is malware'}
-  description: 'XProtect : logiciel malveillant détecté/remédié par macOS'
+  match: {process: 'XProtect|syspolicyd', message: 'detected malware|is malware|malware (found|detected|blocked)|"caused_by"\s*:\s*\[\s*[^\]\s]|"status_message"\s*:\s*"(?!NoThreatDetected")[^"]*(Threat|Remediat|Malware)'}
+  not_match: {message: '"caused_by"\s*:\s*\[\s*\]\s*[,}].*NoThreatDetected|"status_message"\s*:\s*"NoThreatDetected".*"caused_by"\s*:\s*\[\s*\]'}
+  description: 'XProtect : logiciel malveillant détecté/remédié par macOS ({process})'
   mitre: [T1204.002]
   groups: [xprotect, malware]
 
 - id: 100141
-  level: 12
+  level: 7
   module: logs
-  match: {subsystem: 'XProtectFramework', message: 'detect|remediat|malware'}
-  description: 'XProtect Remediator : détection de menace'
+  match: {process: 'XProtectRemediator', message: '"status_message"\s*:\s*"(?!NoThreatDetected")'}
+  description: 'XProtect Remediator : résultat inhabituel ({process}) — à vérifier'
   mitre: [T1204.002]
-  groups: [xprotect, malware]
+  groups: [xprotect]
 
 - id: 100150
   level: 7
@@ -141,7 +142,8 @@
   groups: [login, authentication_failed]
 
 - id: 100161
-  level: 5
+  # Une faute de frappe au déverrouillage génère 2-3 lignes : simple information, la corrélation 100162 gère l'alerte.
+  level: 3
   module: logs
   match: {process: 'opendirectoryd', message: 'Authentication failed for .*CredentialsInvalid'}
   description: 'Échec d''authentification locale : mot de passe invalide (Open Directory)'
@@ -151,7 +153,8 @@
 - id: 100162
   level: 10
   if_matched_sid: 100161
-  frequency: 5
+  # ≈ 5 tentatives ratées en 2 min (chaque tentative produit 2-3 lignes opendirectoryd)
+  frequency: 12
   timeframe: 120
   description: 'Multiples échecs d''authentification locale (force brute possible)'
   mitre: [T1110]

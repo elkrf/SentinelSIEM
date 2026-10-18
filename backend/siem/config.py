@@ -64,7 +64,21 @@ DEFAULT_SETTINGS = {
         r"/\.Trash", r"\.zcompdump", r"/claude-\d+/", r"\.sb-[0-9a-f]+-", r"/\.cache/", r"\.lock$",
         r"/com\.apple\.launchd", r"\.sock$", r"/powerlog", r"\.claude",
     ],
-    "suspicious_ports": [4444, 4445, 1337, 31337, 6667, 6697, 3333, 5555, 7777, 8888, 9001, 9050, 14444, 45700, 1080],
+    # Chemins jamais analysés par l'antimalware (regex) : données d'assistants IA, caches navigateurs,
+    # dépôts de paquets… Ils contiennent du texte qui *parle* de malwares (règles, docs, conversations)
+    # et ne sont pas exécutés tels quels : les analyser ne produit que des faux positifs.
+    "scan_exclude": [
+        r"/\.(claude|codex|cursor|gemini|copilot|continue|aider)(/|$)",
+        r"/Library/Application Support/(Claude|Cursor|Code|ChatGPT)/",
+        r"/Library/Caches/(Google/Chrome|com\.google\.Chrome|BraveSoftware|Microsoft Edge|Firefox|com\.apple\.Safari|com\.operasoftware|Arc|company\.thebrowser)",
+        r"/Library/Application Support/(Google/Chrome|BraveSoftware|Microsoft Edge|Arc)/.*/(Cache|Code Cache|GPUCache|Service Worker|IndexedDB|File System)/",
+        r"/Library/Application Support/Firefox/Profiles/.*/(cache2|storage)/",
+        r"/Library/(Containers/com\.apple\.Safari|Safari)/",
+        r"/node_modules/", r"/\.git/", r"/\.npm/", r"/\.cache/", r"/site-packages/", r"/\.venv/",
+        r"/Library/Caches/(Homebrew|pip|pypoetry|yarn|com\.apple\.dt\.Xcode)/",
+        r"/Library/Developer/(Xcode|CoreSimulator)/",
+    ],
+    "suspicious_ports":[4444, 4445, 1337, 31337, 6667, 6697, 3333, 5555, 7777, 8888, 9001, 9050, 14444, 45700, 1080],
     "ioc_ips": [],
     "ioc_hashes": [],
 }

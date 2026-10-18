@@ -147,7 +147,11 @@
   level: 6
   module: process
   type: [new, existing]
-  match: {cmdline: '(ps|pgrep|launchctl\s+list).*(LittleSnitch|LuLu|BlockBlock|KnockKnock|ClamAV|clamd|XProtect|Sentinel|CrowdStrike|falcon)'}
+  # La commande ps/pgrep/launchctl doit elle-même viser l'outil de sécurité (même segment de commande),
+  # pas simplement apparaître quelque part dans un long script.
+  match: {cmdline: '(^|[\s/;|&(])(ps\s|pgrep\s|pkill\s|launchctl\s+list)[^;|&\n]{0,120}(LittleSnitch|LuLu|BlockBlock|KnockKnock|ClamAV|clamd|XProtect|Sentinel|CrowdStrike|falcon)'}
+  # Outils d'administration de SentinelSIEM et assistants de code
+  not_match: {cmdline: 'SentinelSIEM|siemctl|\.claude/|\.codex/'}
   description: 'Recherche de logiciels de sécurité : {cmdline}'
   mitre: [T1518.001]
   groups: [process, discovery]
@@ -274,6 +278,8 @@
   level: 7
   module: process
   type: high_cpu
+  # Processus légitimes connus pour consommer beaucoup de CPU (antivirus, indexation, compilation, système)
+  not_match: {name: '^(clamd|clamscan|freshclam|mds|mds_stores|mdworker(_shared)?|mediaanalysisd|photoanalysisd|kernel_task|WindowServer|backupd|softwareupdated|com\.apple\..*|XprotectService|XProtect.*|syspolicyd|trustd|bird|cloudd|fileproviderd|swift(-frontend)?|clang(\+\+)?|cc1(plus)?|ld|xcodebuild|XCBBuildService|ibtoold|node|ffmpeg|HandBrake.*|Docker.*|qemu-system.*|yara)$'}
   description: 'Consommation CPU anormale soutenue : {name} ({cpu}% pendant {duration}s) — minage possible'
   mitre: [T1496]
   groups: [process, resource]

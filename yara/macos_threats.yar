@@ -1,6 +1,13 @@
 /*
    SentinelSIEM — règles YARA orientées macOS
    meta.severity : critical | high | medium | low
+
+   Variables externes fournies par le scanner : filename, extension (sans le point, en minuscules).
+   En ligne de commande : yara -d filename=x -d extension=sh macos_threats.yar <fichier>
+
+   Principe anti-faux-positifs : les règles « texte » ne s'appliquent qu'à du contenu réellement
+   exécutable (Mach-O, script avec shebang, AppleScript compilé, extension de script). Une doc, un
+   JSON, une conversation ou un fichier de règles qui *cite* un malware ne déclenche rien.
 */
 
 private rule IsMachO
@@ -8,6 +15,20 @@ private rule IsMachO
     condition:
         uint32(0) == 0xfeedfacf or uint32(0) == 0xcffaedfe or uint32(0) == 0xfeedface or
         uint32(0) == 0xcefaedfe or uint32(0) == 0xbebafeca or uint32(0) == 0xcafebabe
+}
+
+private rule IsScript
+{
+    condition:
+        uint16(0) == 0x2123 or                 // "#!" (shebang)
+        uint32(0) == 0x64736146 or             // "Fasd" : AppleScript compilé (.scpt)
+        extension matches /^(sh|bash|zsh|ksh|command|tool|py|pyw|pl|rb|php\d?|phtml|jsp|jspx|asp|aspx|scpt|applescript|ps1|vbs|bat|cmd)$/
+}
+
+private rule IsReferenceText
+{
+    condition:
+        extension matches /^(md|markdown|rst|txt|log|json|jsonl|ndjson|ya?ml|yar|yara|rules?|html?|xml|csv|tsv|pdf|ipynb)$/
 }
 
 rule EICAR_Test_File
@@ -43,7 +64,7 @@ rule MacOS_Stealer_AMOS
         $s12 = "/tmp/out.zip" ascii
         $s13 = "ditto -c -k --sequesterRsrc" ascii
     condition:
-        filesize < 30MB and (
+        filesize < 30MB and (IsMachO or IsScript) and (
             ($s1 and $s2 and ($s4 or $s5)) or
             (5 of ($s*))
         )
@@ -70,7 +91,7 @@ rule MacOS_Stealer_Generic_Browser_Wallets
         $x1 = "api.telegram.org/bot" ascii wide
         $x2 = "/sendDocument" ascii wide
     condition:
-        filesize < 50MB and (2 of ($b*)) and (1 of ($w*) or $k1) and (1 of ($x*) or 3 of ($w*))
+        filesize < 50MB and (IsMachO or IsScript) and (2 of ($b*)) and (1 of ($w*) or $k1) and (1 of ($x*) or 3 of ($w*))
 }
 
 rule MacOS_Fake_Password_Prompt_Script
@@ -84,7 +105,7 @@ rule MacOS_Fake_Password_Prompt_Script
         $b = "hidden answer" ascii nocase
         $c = /(password|mot de passe|passwd)/ nocase
     condition:
-        filesize < 5MB and all of them
+        filesize < 5MB and IsScript and all of them
 }
 
 rule Unix_Reverse_Shell_Script
@@ -99,10 +120,10 @@ rule Unix_Reverse_Shell_Script
         $r3 = /mkfifo[^\n]{0,80}\bnc\b/ ascii
         $r4 = /socket\.socket\([^\n]{0,200}\.connect\([^\n]{0,200}(dup2|pty\.spawn|subprocess)/ ascii
         $r5 = /socat[^\n]{0,80}exec:[^\n]{0,20}(ba|z)?sh/ ascii nocase
-        $r6 = "use Socket;" ascii
+        $r6 = /use Socket;[^\x00]{0,400}exec\s*\(?\s*["']\/bin\/(ba|z)?sh/ ascii
         $r7 = /fsockopen\([^\n]{0,100}(exec|shell_exec|system|proc_open)/ ascii
     condition:
-        filesize < 2MB and any of them
+        filesize < 2MB and IsScript and any of them
 }
 
 rule Download_And_Execute_Dropper
@@ -122,7 +143,7 @@ rule Download_And_Execute_Dropper
         $e2 = "launchctl load" ascii
         $e3 = "LaunchAgents" ascii
     condition:
-        filesize < 10MB and (
+        filesize < 10MB and IsScript and (
             $d6 or
             ($d2) or
             (($d1 or $d2) and ($d3 or $d4 or $d5)) or
@@ -147,7 +168,7 @@ rule MacOS_Persistence_Script
         $x2 = "/Users/Shared/" ascii
         $x3 = /\/(private\/)?tmp\/\./ ascii
     condition:
-        filesize < 5MB and not IsMachO and ($p1 or $p2) and $p3 and ($p4 or $p5) and any of ($x*)
+        filesize < 5MB and IsScript and ($p1 or $p2) and $p3 and ($p4 or $p5) and any of ($x*)
 }
 
 rule CryptoMiner_XMRig
@@ -168,7 +189,7 @@ rule CryptoMiner_XMRig
         $m9 = "supportxmr.com" ascii nocase
         $m10 = "nanopool.org" ascii nocase
     condition:
-        filesize < 30MB and 3 of them
+        filesize < 30MB and (IsMachO or IsScript) and 3 of them
 }
 
 rule Ransomware_Note
@@ -186,8 +207,10 @@ rule Ransomware_Note
         $n6 = ".onion" ascii wide nocase
         $n7 = "private key" ascii wide nocase
         $n8 = "do not rename" ascii wide nocase
+        $z1 = /\n\s*strings:\s*\n/ ascii     // source de règles YARA (qui cite les phrases ci-dessus)
+        $z2 = /\n\s*condition:\s*\n/ ascii
     condition:
-        filesize < 1MB and (1 of ($n1, $n2, $n3)) and 2 of ($n4, $n5, $n6, $n7, $n8)
+        filesize < 1MB and not ($z1 and $z2) and not IsMachO and not (extension matches /^(md|markdown|rst|json|jsonl|ya?ml|yar|yara|ipynb)$/) and (1 of ($n1, $n2, $n3)) and 2 of ($n4, $n5, $n6, $n7, $n8)
 }
 
 rule Ransomware_Encryptor_Script
@@ -203,7 +226,7 @@ rule Ransomware_Encryptor_Script
         $d = "os.walk(" ascii
         $e = ".encrypted" ascii
     condition:
-        filesize < 5MB and ($a or $b or ($c and $d and $e))
+        filesize < 5MB and IsScript and ($a or $b or ($c and $d and $e))
 }
 
 rule Webshell_Generic
@@ -219,7 +242,7 @@ rule Webshell_Generic
         $p4 = "Runtime.getRuntime().exec(request.getParameter" ascii
         $p5 = /preg_replace\s*\(\s*['"][^'"]*\/e['"]/ ascii
     condition:
-        filesize < 2MB and any of them
+        filesize < 2MB and IsScript and any of them
 }
 
 rule Python_Obfuscated_Loader
@@ -233,7 +256,7 @@ rule Python_Obfuscated_Loader
         $b = /__import__\(\s*['"](base64|zlib|marshal)['"]\s*\)\.(b64decode|decompress|loads)/ ascii
         $c = /exec\(\s*['"][A-Za-z0-9+\/=]{300,}/ ascii
     condition:
-        filesize < 10MB and any of them
+        filesize < 10MB and IsScript and any of them
 }
 
 rule MacOS_Keylogger_EventTap
@@ -244,12 +267,15 @@ rule MacOS_Keylogger_EventTap
         family = "Keylogger"
     strings:
         $a = "CGEventTapCreate" ascii
-        $b = "kCGEventKeyDown" ascii
         $c = "CGEventKeyboardGetUnicodeString" ascii
-        $d = /keylog/ nocase
+        $d = /key ?logger|keystroke ?log|keystrokes\.(txt|log)/ nocase
         $e = "IOHIDManagerRegisterInputValueCallback" ascii
+        $x1 = "/sendDocument" ascii
+        $x2 = /https?:\/\/[^\x00]{4,80}\/(upload|log|keys)/ ascii
     condition:
-        IsMachO and filesize < 20MB and (($a and ($b or $c)) or ($d and ($a or $e)))
+        // Un simple raccourci clavier global (CGEventTap seul) n'est pas suspect :
+        // on exige la lecture du texte tapé + un indice de journalisation ou d'envoi.
+        IsMachO and filesize < 20MB and ($a or $e) and $c and ($d or any of ($x*))
 }
 
 rule MacOS_Backdoor_Indicators
@@ -288,5 +314,5 @@ rule Hacktool_Mimikatz_Like
         $d = "dump_keychain_passwords" ascii
         $e = "sekurlsa::" ascii
     condition:
-        filesize < 50MB and any of them
+        filesize < 50MB and (IsMachO or IsScript) and not IsReferenceText and (2 of them or $e or ($d and IsScript))
 }
